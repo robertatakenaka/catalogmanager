@@ -1,7 +1,5 @@
 # coding=utf-8
 
-import os
-
 from catalog_persistence.models import (
         get_record,
         RecordType,
@@ -23,8 +21,9 @@ class ArticleServices:
         self.article_db_service = DatabaseService(
             articles_db_manager, changes_db_manager)
 
-    def receive_article(self, xml, files):
+    def receive_article(self, id, xml, files):
         article = Article(xml, files)
+        article.id = id
         article_record = Record(
             document_id=article.id,
             content=article.get_record_content(),
@@ -33,17 +32,17 @@ class ArticleServices:
         self.article_db_service.register(
             article.id, article_record)
 
-        self.article_db_service.register_attachment(
+        self.article_db_service.put_attachment(
                 document_id=article.id,
-                attach_name=article.xml_tree.basename,
-                content=article.xml_tree.filename
+                filename=article.xml_tree.basename,
+                content=article.xml_tree.content
             )
 
-        if files is not None:
-            for f in files:
-                self.article_db_service.register_attachment(
+        if article.assets is not None:
+            for name, asset in article.assets.items():
+                self.article_db_service.put_attachment(
                         document_id=article.id,
-                        attach_name=os.path.basename(f),
-                        content=f
+                        filename=asset.asset_name,
+                        content=asset.file_content
                     )
-        return self.article_data_services.location(article.id)
+        return self.article_db_service.read(article.id)
