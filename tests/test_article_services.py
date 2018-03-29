@@ -31,4 +31,6 @@ def test_receive_article():
 
     expected = {}
     got = article_services.receive_article('ID', xml_filename, files)
+    print(expected)
+    print(got)
     assert expected == got

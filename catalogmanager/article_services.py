@@ -8,10 +8,23 @@ from catalog_persistence.databases import (
         DatabaseService,
     )
 from .data_services import DataServices
-from .models.article_model import Article
+from .models.article_model import (
+    Article,
+    File
+)
 
 
 Record = get_record
+
+
+def FileProperties(file):
+    return {
+        'content_size': file.size,
+        'content_type': file.content_type,
+        'file_fullpath': file.file_fullpath,
+        'file_name': file.name,
+        'file_path': file.path,
+    }
 
 
 class ArticleServices:
@@ -32,17 +45,20 @@ class ArticleServices:
         self.article_db_service.register(
             article.id, article_record)
 
+        f = File(article.xml_tree.file_fullpath)
         self.article_db_service.put_attachment(
                 document_id=article.id,
-                filename=article.xml_tree.basename,
-                content=article.xml_tree.content
+                file_id=f.name,
+                content=f.content,
+                file_properties=FileProperties(f)
             )
 
         if article.assets is not None:
             for name, asset in article.assets.items():
                 self.article_db_service.put_attachment(
                         document_id=article.id,
-                        filename=asset.asset_name,
-                        content=asset.file_content
+                        file_id=asset.file.name,
+                        content=asset.file.content,
+                        file_properties=FileProperties(asset.file)
                     )
         return self.article_db_service.read(article.id)
