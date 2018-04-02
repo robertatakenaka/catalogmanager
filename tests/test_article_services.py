@@ -29,8 +29,34 @@ def test_receive_article():
 
     article_services = ArticleServices(articles_db_manager, changes_db_manager)
 
-    expected = {}
+    article_content = {
+        'xml': '0034-8910-rsp-S01518-87872016050006741.xml',
+        'assets': [
+            {
+                'file_href': '0034-8910-rsp-S01518-87872016050006741-gf01.jpg',
+                'file_id': '0034-8910-rsp-S01518-87872016050006741-gf01.jpg'
+            },
+            {
+                'file_href': '0034-8910-rsp-S01518-87872016050006741-gf01-pt.jpg',
+                'file_id': '0034-8910-rsp-S01518-87872016050006741-gf01-pt.jpg'
+            },
+        ]
+    }
+
+    expected = {
+        'attachments': [
+            '0034-8910-rsp-S01518-87872016050006741.xml',
+            '0034-8910-rsp-S01518-87872016050006741-gf01.jpg',
+            '0034-8910-rsp-S01518-87872016050006741-gf01-pt.jpg',
+        ],
+        'content': article_content,
+        'document_type': 'ART',
+        'document_id': 'ID',
+    }
+
     got = article_services.receive_article('ID', xml_filename, files)
+    if 'created_date' in got.keys():
+        del got['created_date']
     print(expected)
     print(got)
     assert expected == got

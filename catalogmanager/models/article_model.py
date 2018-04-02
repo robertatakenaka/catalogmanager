@@ -31,7 +31,7 @@ class Asset:
         self.document_id = None
 
     def get_record_content(self):
-        return {self.name: self.file.name}
+        return {'file_href': self.name, 'file_id': self.file.name}
 
     @property
     def href(self):
@@ -52,6 +52,7 @@ class Article:
         self.asset_files = asset_files
         if asset_files is not None:
             self.asset_files = {os.path.basename(f): f for f in asset_files if os.path.isfile(f)}
+        self.assets = {name: Asset(node, File(self.asset_files.get(name))) for name, node in self.xml_tree.asset_nodes.items()}
 
     @property
     def xml_tree(self):
@@ -64,18 +65,12 @@ class Article:
     def get_record_content(self):
         record_content = {}
         record_content['xml'] = self.xml_tree.file_name
-        record_content['assets'] = {}
+        record_content['assets'] = []
         for asset in self.assets.values():
             asset.document_id = self.id
-            record_content['assets'].update(asset.get_record_content())
+            record_content['assets'].append(asset.get_record_content())
         print('record', record_content)
         return record_content
-
-    @property
-    def assets(self):
-        if self.xml_tree.asset_nodes is not None:
-            return {name: Asset(node, File(self.asset_files.get(name))) for name, node in self.xml_tree.asset_nodes.items()}
-        return {}
 
     @property
     def missing_files_list(self):
