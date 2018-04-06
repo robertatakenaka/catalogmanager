@@ -3,26 +3,31 @@ import os
 from catalog_persistence.databases import (
     InMemoryDBManager,
 )
-from catalog_persistence.models import (
-    RecordType,
-)
 
 from catalogmanager.article_services import(
     ArticleServices,
 )
 
+from catalogmanager.models.article_model import(
+    Article,
+)
 
-def get_article(filename):
-    path = os.path.dirname(filename)
-    files = [path + '/' + item for item in os.listdir(path) if not item.endswith('.xml')]
-    xml_filename = filename
-    return (xml_filename, files)
+from .test_article_files import(
+    FIXTURE_DIR,
+    get_files,
+)
 
 
-def test_receive_article():
+def test_receive_xml_file():
 
-    xml_filename = '/Users/roberta.takenaka/github.com/scieloorg/catalogmanager/packages/0034-8910-rsp-S01518-87872016050006741/0034-8910-rsp-S01518-87872016050006741.xml'
-    xml_filename, files = get_article(xml_filename)
+    xml_file_path = os.path.join(
+        FIXTURE_DIR,
+        '741b/0034-8910-rsp-S01518-87872016050006741.xml'
+    )
+    files = get_files(xml_file_path)
+    article = Article('ID')
+    article.xml_file = xml_file_path
+    assets = article.update_asset_files(files)
 
     changes_db_manager = InMemoryDBManager(database_name='changes')
     articles_db_manager = InMemoryDBManager(database_name='articles')
@@ -32,14 +37,8 @@ def test_receive_article():
     article_content = {
         'xml': '0034-8910-rsp-S01518-87872016050006741.xml',
         'assets': [
-            {
-                'file_href': '0034-8910-rsp-S01518-87872016050006741-gf01.jpg',
-                'file_id': '0034-8910-rsp-S01518-87872016050006741-gf01.jpg'
-            },
-            {
-                'file_href': '0034-8910-rsp-S01518-87872016050006741-gf01-pt.jpg',
-                'file_id': '0034-8910-rsp-S01518-87872016050006741-gf01-pt.jpg'
-            },
+            '0034-8910-rsp-S01518-87872016050006741-gf01.jpg',
+            '0034-8910-rsp-S01518-87872016050006741-gf01-pt.jpg',
         ]
     }
 
@@ -54,9 +53,26 @@ def test_receive_article():
         'document_id': 'ID',
     }
 
-    got = article_services.receive_article('ID', xml_filename, files)
-    if 'created_date' in got.keys():
-        del got['created_date']
-    print(expected)
-    print(got)
-    assert expected == got
+    article = article_services.receive_xml_file('ID', xml_file_path)
+
+
+def test_receive_package():
+
+    xml_file_path = os.path.join(
+        FIXTURE_DIR,
+        '741a/0034-8910-rsp-S01518-87872016050006741.xml'
+    )
+    files = get_files(xml_file_path)
+    article = Article('ID')
+    article.xml_file = xml_file_path
+    assets = article.update_asset_files(files)
+
+    changes_db_manager = InMemoryDBManager(database_name='changes')
+    articles_db_manager = InMemoryDBManager(database_name='articles')
+
+    article_services = ArticleServices(articles_db_manager, changes_db_manager)
+
+    unexpected, missing = article_services.receive_package(
+        'ID', xml_file_path, files)
+    assert unexpected == []
+    assert missing == []
