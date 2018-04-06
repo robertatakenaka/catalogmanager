@@ -6,19 +6,15 @@ from catalogmanager.models.article_model import (
 from catalogmanager.xml.xml_tree import (
     XMLTree,
 )
-
-from .test_article_files import(
-    FIXTURE_DIR,
-    get_files,
+from .conftest import (
+    PKG_A,
+    PKG_B,
+    PKG_C,
 )
 
 
 def test_article():
-    xml_file_path = os.path.join(
-        FIXTURE_DIR,
-        '741a/0034-8910-rsp-S01518-87872016050006741.xml'
-    )
-    files = get_files(xml_file_path)
+    xml_file_path, files = PKG_A[0], PKG_A[1:]
     article = Article('ID')
     article.xml_file = xml_file_path
     assets = article.update_asset_files(files)
@@ -42,11 +38,7 @@ def test_article():
 
 
 def test_missing_files_list():
-    xml_file_path = os.path.join(
-        FIXTURE_DIR,
-        '741b/0034-8910-rsp-S01518-87872016050006741.xml'
-    )
-    files = get_files(xml_file_path)
+    xml_file_path, files = PKG_B[0], PKG_B[1:]
     article = Article('ID')
     article.xml_file = xml_file_path
 
@@ -67,11 +59,8 @@ def test_missing_files_list():
 
 
 def test_unexpected_files_list():
-    xml_file_path = os.path.join(
-        FIXTURE_DIR,
-        '741c/0034-8910-rsp-S01518-87872016050006741.xml'
-    )
-    files = get_files(xml_file_path)
+    xml_file_path, files = PKG_C[0], PKG_C[1:]
+
     article = Article('ID')
     article.xml_file = xml_file_path
     assets = article.update_asset_files(files)
@@ -84,20 +73,14 @@ def test_unexpected_files_list():
         ]
     )
     assert article.unexpected_files_list == [
-        os.path.join(
-            FIXTURE_DIR,
-            '741c/fig.jpg'
-        )
+       files[2]
     ]
     assert article.missing_files_list == []
 
 
 def test_update_href():
-    xml_file_path = os.path.join(
-        FIXTURE_DIR,
-        '741a/0034-8910-rsp-S01518-87872016050006741.xml'
-    )
-    files = get_files(xml_file_path)
+    xml_file_path, files = PKG_A[0], PKG_A[1:]
+
     article = Article('ID')
     article.xml_file = xml_file_path
     assets = article.update_asset_files(files)

@@ -10,7 +10,11 @@ requires = [
     'waitress',
 ]
 
-test_requires = ['webtest', 'pytest', 'pytest-cov']
+test_requires = [
+    'webtest',
+    'pytest',
+    'pytest-cov',
+]
 
 setup(
     name="catalogmanager",
