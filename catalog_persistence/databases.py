@@ -82,6 +82,7 @@ class InMemoryDBManager(BaseDBManager):
         return doc
 
     def update(self, id, document):
+        print({id: document})
         self.database.update({id: document})
 
     def delete(self, id):
@@ -105,11 +106,20 @@ class InMemoryDBManager(BaseDBManager):
             return [doc for i, doc in self.database.items()]
         results = []
         for id, doc in self.database.items():
+            print(id, doc.get('document_id'), doc.get('document_type'))
             match = True
             for k, v in selector.items():
-                if not doc.get(k) == v:
-                    match = False
-                    break
+                value = doc.get(k)
+                print(value, v)
+                if isinstance(v, tuple) and len(v) == 2:
+                    lim_inf, lim_sup = v
+                    match = (lim_inf <= value)
+                    if lim_sup is not None:
+                        match = match and value <= lim_sup
+                else:
+                    if not value == v:
+                        match = False
+                        break
             if match is True:
                 d = {f: doc.get(f) for f in fields}
                 d['_id'] = id
@@ -215,6 +225,14 @@ class CouchDBManager(BaseDBManager):
             'fields': fields,
             'sort': sort,
         }
+        for field, values in selector.items():
+            if isinstance(values, tuple) in values:
+                selector[field] = {
+                    '$and': [
+                        {field: {'$gte': values[0]}},
+                        {field: {'$lte': values[1]}},
+                    ]
+                }
         return [dict(document) for document in self.database.find(selection_criteria)]
 
     def put_attachment(self, id, file_id, content, content_properties):
@@ -266,6 +284,8 @@ class DatabaseService:
             'change_id': uuid4().hex,
             'document_id': document_record['document_id'],
             'document_type': document_record['document_type'],
+            'document_change_date': document_record.get(
+                'updated_date', document_record['created_date']),
             'type': change_type.value,
             'created_date': str(datetime.utcnow().timestamp()),
         }
