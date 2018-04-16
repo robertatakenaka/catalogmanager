@@ -1,3 +1,4 @@
+import io
 import abc
 from datetime import datetime
 from enum import Enum
@@ -44,6 +45,10 @@ class BaseDBManager(metaclass=abc.ABCMeta):
 
     @abc.abstractmethod
     def put_attachment(self, id, file_id, content, content_properties) -> None:
+        return NotImplemented
+
+    @abc.abstractmethod
+    def get_attachment(self, id, file_id) -> io.IOBase:
         return NotImplemented
 
     @abc.abstractmethod
@@ -143,6 +148,13 @@ class InMemoryDBManager(BaseDBManager):
         doc[self._attachments_key][file_id]['content_size'] = \
             content_properties['content_size']
         self.database.update({id: doc})
+
+    def get_attachment(self, id, file_id):
+        doc = self.read(id)
+        if (doc.get(self._attachments_key) and
+                doc[self._attachments_key].get(file_id)):
+            return doc[self._attachments_key][file_id]['content']
+        return io.BytesIO()
 
     def list_attachments(self, id):
         doc = self.read(id)
@@ -244,10 +256,17 @@ class CouchDBManager(BaseDBManager):
         doc = self.read(id)
         self.database.put_attachment(
             doc=doc,
-            filename=file_id,
             content=content,
+            filename=file_id,
             content_type=content_properties.get('content_type')
         )
+
+    def get_attachment(self, id, file_id):
+        doc = self.read(id)
+        attachment = self.database.get_attachment(doc, file_id)
+        if attachment:
+            return attachment.getbuffer()
+        return io.BytesIO()
 
     def list_attachments(self, id):
         doc = self.read(id)
@@ -400,10 +419,6 @@ class DatabaseService:
         DocumentNotFound: documento não encontrado na base de dados.
         """
         read_record = self.db_manager.read(document_id)
-        if self.db_manager.attachment_exists(document_id, file_id):
-            change_type = ChangeType.UPDATE
-        else:
-            change_type = ChangeType.CREATE
         self.db_manager.put_attachment(document_id,
                                        file_id,
                                        content,
@@ -413,7 +428,23 @@ class DatabaseService:
             'document_type': read_record['document_type'],
             'created_date': read_record['created_date'],
         }
-        self._register_change(document_record, change_type, file_id)
+        self._register_change(document_record, ChangeType.UPDATE, file_id)
+
+    def get_attachment(self, document_id, file_id):
+        """
+        Recupera arquivo anexos ao registro de um documento pelo ID do
+        documento e ID do anexo.
+        Params:
+        document_id: ID do documento ao qual o arquivo está anexado
+        file_id: identificação do arquivo anexado a ser recuperado
+
+        Retorno:
+        Arquivo anexo
+
+        Erro:
+        DocumentNotFound: documento não encontrado na base de dados.
+        """
+        return self.db_manager.get_attachment(document_id, file_id)
 
 
 def sort_results(results, sort):

@@ -28,6 +28,12 @@ def FileProperties(file):
 
 
 class ArticleServicesException(Exception):
+
+    def __init__(self, message):
+        self.message = message
+
+
+class ArticleServicesMissingAssetFileException(Exception):
     pass
 
 
@@ -85,4 +91,41 @@ class ArticleServices:
             article_record = self.article_db_service.read(article_id)
             return article_record
         except DocumentNotFound:
-            raise ArticleServicesException
+            raise ArticleServicesException(
+                'Missing XML file {}'.format(article_id)
+            )
+
+    def get_article_file(self, article_id):
+        article_record = self.get_article_data(article_id)
+        try:
+            return self.article_db_service.get_attachment(
+                document_id=article_id,
+                file_id=article_record['content']['xml']
+            )
+        except DocumentNotFound:
+            raise ArticleServicesException(
+                'Missing XML file {}'.format(article_id)
+            )
+
+    def get_asset_files(self, article_id):
+        article_record = self.get_article_data(article_id)
+        assets = article_record['content'].get('assets') or []
+        asset_files = {}
+        missing = []
+        for file_id in assets:
+            try:
+                asset_files[file_id] = self.get_asset_file(article_id, file_id)
+            except ArticleServicesException:
+                missing.append(file_id)
+        return asset_files, missing
+
+    def get_asset_file(self, article_id, file_id):
+        try:
+            return self.article_db_service.get_attachment(
+                document_id=article_id,
+                file_id=file_id
+            )
+        except DocumentNotFound:
+            raise ArticleServicesException(
+                'Missing asset file: {}. '.format(file_id)
+            )
