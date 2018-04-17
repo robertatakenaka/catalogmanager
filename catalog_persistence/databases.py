@@ -133,7 +133,6 @@ class InMemoryDBManager(BaseDBManager):
         else:
             doc[self._attachments_key][file_id] = {}
             doc[self._attachments_key][file_id]['revision'] = 1
-
         doc[self._attachments_key][file_id]['content'] = content
         doc[self._attachments_key][file_id]['content_type'] = \
             content_properties['content_type']
@@ -148,12 +147,24 @@ class InMemoryDBManager(BaseDBManager):
             return doc[self._attachments_key][file_id]['content']
         return io.BytesIO()
 
+    def put_attachment_properties(self, document, file_id, file_properties):
+        return {}
+
+    def get_attachment_properties(self, id, file_id):
+        doc = self.read(id)
+        _attachments = document.get(self._attachments_key)
+        if _attachments is not None:
+            properties = _attachments.get(file_id)
+            if properties is not None:
+                return {
+                    k: v
+                    for k, v in properties.items()
+                    if k in ['content_type', 'content_size']
+                }
+
     def list_attachments(self, id):
         doc = self.read(id)
         return list(doc.get(self._attachments_key, {}).keys())
-
-    def attachment_exists(self, id, file_id):
-        return file_id in self.list_attachments(id)
 
 
 class CouchDBManager(BaseDBManager):
@@ -225,7 +236,10 @@ class CouchDBManager(BaseDBManager):
             'fields': fields,
             'sort': sort,
         }
-        return [dict(document) for document in self.database.find(selection_criteria)]
+        return [
+            dict(document)
+            for document in self.database.find(selection_criteria)
+        ]
 
     def put_attachment(self, id, file_id, content, content_properties):
         """
@@ -248,12 +262,29 @@ class CouchDBManager(BaseDBManager):
             return attachment.read()
         return io.BytesIO()
 
+    def put_attachment_properties(self, document, file_id, file_properties):
+        _record = {}
+        properties = document.get('_attachments_properties')
+        if properties is not None:
+            _record['_attachments_properties'] = properties
+            if file_id not in _attachments_properties.keys():
+                _record['_attachments_properties'][file_id] = {}
+            _record['_attachments_properties'][file_id].update(file_properties)
+        return _record
+
+    def get_attachment_properties(self, id, file_id):
+        doc = self.read(id)
+        properties = document.get('_attachments_properties', {}).get(file_id)
+        if properties is not None:
+            return {
+                k: v
+                for k, v in properties.items()
+                if k in ['content_type', 'content_size']
+            }
+
     def list_attachments(self, id):
         doc = self.read(id)
         return list(doc.get(self._attachments_key, {}).keys())
-
-    def attachment_exists(self, id, file_id):
-        return file_id in self.list_attachments(id)
 
 
 class DatabaseService:
@@ -397,13 +428,20 @@ class DatabaseService:
                                        content,
                                        file_properties)
         document = self.db_manager.read(document_id)
-        document_record = {
+        _record = {
             'document_id': document['document_id'],
             'document_type': document['document_type'],
             'content': document['content'],
             'created_date': document['created_date']
         }
-        self.update(document_id, document_record)
+        _record.update(
+            self.db_manager.put_attachment_properties(
+                document,
+                file_id,
+                file_properties
+                )
+            )
+        self.update(document_id, _record)
 
     def get_attachment(self, document_id, file_id):
         """
@@ -419,7 +457,13 @@ class DatabaseService:
         Erro:
         DocumentNotFound: documento não encontrado na base de dados.
         """
-        return self.db_manager.get_attachment(document_id, file_id)
+        properties = self.db_manager.get_attachment_properties(
+                document_id,
+                file_id
+            )
+        content_type = properties.get('content_type', '')
+        content = self.db_manager.get_attachment(document_id, file_id)
+        return content_type, content
 
 
 def sort_results(results, sort):

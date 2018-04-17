@@ -68,3 +68,21 @@ class Article:
                 "error": "404",
                 "message": "Article not found"
             })
+
+    @view_config(route_name='get_asset_file')
+    def get_asset_file(self):
+        try:
+            content_type, asset_file_content = catalogmanager.get_asset_file(
+                article_id=self.request.matchdict['id'],
+                asset_id=self.request.matchdict['asset_id'],
+                **self.db_settings
+            )
+            return Response(
+                content_type=content_type,
+                body=asset_file_content
+            )
+        except catalogmanager.article_services.ArticleServicesException as e:
+            return json.dumps({
+                "error": "404",
+                "message": "Asset not found"
+            })

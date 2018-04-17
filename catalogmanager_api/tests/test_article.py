@@ -125,3 +125,120 @@ def test_http_article_put_article_succeeded(mocked_put_article,
                          params=params,
                          content_type='multipart/form-data')
     assert result.status == '200 OK'
+
+
+@patch.object(catalogmanager, 'get_asset_file')
+def test_http_get_asset_file_not_found(mocked_get_asset_file, testapp):
+    article_id = 'ID123456'
+    asset_id = 'ID123456'
+    mocked_get_asset_file.side_effect = \
+        catalogmanager.article_services.ArticleServicesException(
+            message='Asset file "{}" of article "{}" is not registered. '.format(
+                    asset_id, article_id)
+        )
+    expected = {
+        "error": "404",
+        "message":
+            'Asset file "ID123456" of article "ID123456" is not registered. '
+    }
+    result = testapp.get('/articles/{}/{}'.format(article_id, asset_id))
+    assert result.status == '200 OK'
+    assert result.json == json.dumps(expected)
+
+
+"""
+@patch.object(catalogmanager, 'get_asset_file')
+def test_http_get_asset_file_succeeded(mocked_get_asset_file, testapp):
+    article_id = 'ID123456'
+    asset_id = 'ID123456'
+    expected = {
+        "document_id": article_id,
+        "document_type": "ART",
+        "content": {
+            'xml': "test.xml",
+            'assets': ["img1.png", "img2.png", "img3.png"]
+        },
+    }
+    mocked_get_asset_file.return_value = expected
+    result = testapp.get('/articles/{}/{}'.format(article_id, asset_id))
+    assert result.status == '200 OK'
+    assert result.json == json.dumps(expected)
+
+
+@patch.object(catalogmanager, 'put_asset_file')
+def test_http_article_calls_put_asset_file(
+                                    mocked_put_asset_file,
+                                    db_settings,
+                                    testapp,
+                                    asset_file):
+    article_id = 'ID-post-article-123'
+    asset_id = 'A123'
+    params = OrderedDict([
+        ('article_id', article_id),
+        ('asset_id', asset_id),
+        ('asset_file',
+         webtest.forms.Upload("asset_file.svg",
+                              asset_file.encode('utf-8')))
+    ])
+    testapp.put('/articles/{}/{}'.format(article_id, asset_id),
+                params=params,
+                content_type='multipart/form-data')
+    mocked_put_asset_file.assert_called_once_with(
+        article_id=article_id,
+        xml_properties={
+            'filename': "asset_file.svg",
+            'content': asset_file.encode('utf-8'),
+            'content_size': len(asset_file)
+        },
+        **db_settings
+    )
+
+
+@patch.object(catalogmanager, 'put_asset_file')
+def test_http_article_calls_put_asset_file_service_error(
+                                                mocked_put_asset_file,
+                                                testapp,
+                                                asset_file):
+    article_id = 'ID-post-article-123'
+    asset_id = 'A123'
+    mocked_put_asset_file.side_effect = \
+        catalogmanager.article_services.ArticleServicesException(
+            message='Missing XML file {}'.format(article_id)
+        )
+    expected = {
+        "error": "500",
+        "message": "Article error"
+    }
+    params = OrderedDict([
+        ('article_id', article_id),
+        ('asset_id', asset_id),
+        ('asset_file',
+         webtest.forms.Upload("asset_file.svg",
+                              asset_file.encode('utf-8')))
+    ])
+    result = testapp.put('/articles/{}/{}'.format(article_id, asset_id),
+                         params=params,
+                         content_type='multipart/form-data')
+    assert result.status == '200 OK'
+    assert result.json == json.dumps(expected)
+
+
+@patch.object(catalogmanager, 'put_asset_file')
+def test_http_article_put_asset_file_succeeded(
+                                        mocked_put_asset_file,
+                                        testapp,
+                                        asset_file):
+    article_id = 'ID-post-article-123'
+    asset_id = 'A123'
+    params = OrderedDict([
+        ('article_id', article_id),
+        ('asset_id', asset_id),
+        ('asset_file',
+         webtest.forms.Upload("asset_file.svg",
+                              asset_file.encode('utf-8')))
+    ])
+    result = testapp.put('/articles/{}/{}'.format(article_id, asset_id),
+                         params=params,
+                         content_type='multipart/form-data')
+    assert result.status == '200 OK'
+"""

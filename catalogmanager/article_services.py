@@ -8,7 +8,7 @@ from catalog_persistence.databases import (
         DatabaseService,
         DocumentNotFound
     )
-from .data_services import DataServices
+
 from .models.article_model import (
     Article,
 )
@@ -41,7 +41,6 @@ class ArticleServicesMissingAssetFileException(Exception):
 class ArticleServices:
 
     def __init__(self, articles_db_manager, changes_db_manager):
-        self.article_data_services = DataServices('articles')
         self.article_db_service = DatabaseService(
             articles_db_manager, changes_db_manager)
 
@@ -138,5 +137,6 @@ class ArticleServices:
             )
         except DocumentNotFound:
             raise ArticleServicesException(
-                'Missing asset file: {}. '.format(file_id)
+                'Asset file "{}" of article "{}" is not registered. '.format(
+                    file_id, article_id)
             )
