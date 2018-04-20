@@ -55,16 +55,13 @@ class BaseDBManager(metaclass=abc.ABCMeta):
     def list_attachments(self, id) -> list:
         return NotImplemented
 
-    @abc.abstractmethod
-    def attachment_exists(self, id, file_id) -> bool:
-        return NotImplemented
-
 
 class InMemoryDBManager(BaseDBManager):
 
     def __init__(self, **kwargs):
         self._database_name = kwargs['database_name']
         self._attachments_key = 'attachments'
+        self._attachments_properties_key = 'attachments_properties'
         self._database = {}
 
     @property
@@ -87,8 +84,9 @@ class InMemoryDBManager(BaseDBManager):
         return doc
 
     def update(self, id, document):
-        print({id: document})
-        self.database.update({id: document})
+        _document = self.read(id)
+        _document.update(document)
+        self.database.update({id: _document})
 
     def delete(self, id):
         self.read(id)
@@ -102,7 +100,7 @@ class InMemoryDBManager(BaseDBManager):
         selector: criterio para selecionar campo com determinados valores
             Ex.: {'type': 'ART'}
         fields: lista de campos para retornar. Ex.: ['name']
-        sort: lista de dict com nome de campo e sua ordenacao. [{'name': 'asc'}]
+        sort: lista de dict com nome de campo e sua ordenacao.[{'name': 'asc'}]
 
         Retorno:
         Lista de registros de documento registrados na base de dados
@@ -149,6 +147,18 @@ class InMemoryDBManager(BaseDBManager):
             content_properties['content_size']
         self.database.update({id: doc})
 
+    def _add_attachment_properties(self, record, file_id, file_properties):
+        """
+        """
+        if not record.get(self._attachments_properties_key):
+            record[self._attachments_properties_key] = {}
+        if not record[self._attachments_properties_key].get(file_id):
+            record[self._attachments_properties_key][file_id] = {}
+
+        record[self._attachments_properties_key][file_id].update(
+            file_properties)
+        return record
+
     def get_attachment(self, id, file_id):
         doc = self.read(id)
         if (doc.get(self._attachments_key) and
@@ -160,19 +170,13 @@ class InMemoryDBManager(BaseDBManager):
         doc = self.read(id)
         return list(doc.get(self._attachments_key, {}).keys())
 
-    def attachment_exists(self, id, file_id):
-        doc = self.read(id)
-        return (
-            doc.get(self._attachments_key) and
-            doc[self._attachments_key].get(file_id)
-        )
-
 
 class CouchDBManager(BaseDBManager):
 
     def __init__(self, **kwargs):
         self._database_name = kwargs['database_name']
         self._attachments_key = '_attachments'
+        self._attachments_properties_key = 'attachments_properties'
         self._database = None
         self._db_server = couchdb.Server(kwargs['database_uri'])
         self._db_server.resource.credentials = (
@@ -227,7 +231,7 @@ class CouchDBManager(BaseDBManager):
         selector: criterio para selecionar campo com determinados valores
             Ex.: {'type': 'ART'}
         fields: lista de campos para retornar. Ex.: ['name']
-        sort: lista de dict com nome de campo e sua ordenacao. [{'name': 'asc'}]
+        sort: lista de dict com nome de campo e sua ordenacao.[{'name': 'asc'}]
 
         Retorno:
         Lista de registros de documento registrados na base de dados
@@ -245,7 +249,10 @@ class CouchDBManager(BaseDBManager):
                         {field: {'$lte': values[1]}},
                     ]
                 }
-        return [dict(document) for document in self.database.find(selection_criteria)]
+        return [
+            dict(document)
+            for document in self.database.find(selection_criteria)
+        ]
 
     def put_attachment(self, id, file_id, content, content_properties):
         """
@@ -261,23 +268,28 @@ class CouchDBManager(BaseDBManager):
             content_type=content_properties.get('content_type')
         )
 
+    def _add_attachment_properties(self, record, file_id, file_properties):
+        """
+        """
+        if not record.get(self._attachments_properties_key):
+            record[self._attachments_properties_key] = {}
+        if not record[self._attachments_properties_key].get(file_id):
+            record[self._attachments_properties_key][file_id] = {}
+
+        record[self._attachments_properties_key][file_id].update(
+            file_properties)
+        return record
+
     def get_attachment(self, id, file_id):
         doc = self.read(id)
         attachment = self.database.get_attachment(doc, file_id)
         if attachment:
-            return attachment.getbuffer()
+            return attachment.read()
         return io.BytesIO()
 
     def list_attachments(self, id):
         doc = self.read(id)
         return list(doc.get(self._attachments_key, {}).keys())
-
-    def attachment_exists(self, id, file_id):
-        doc = self.read(id)
-        return (
-            doc.get(self._attachments_key) and
-            doc[self._attachments_key].get(file_id)
-        )
 
 
 class DatabaseService:
@@ -397,7 +409,7 @@ class DatabaseService:
         selector: criterio para selecionar campo com determinados valores
             Ex.: {'type': 'ART'}
         fields: lista de campos para retornar. Ex.: ['name']
-        sort: lista de dict com nome de campo e sua ordenacao. [{'name': 'asc'}]
+        sort: lista de dict com nome de campo e sua ordenacao.[{'name': 'asc'}]
 
         Retorno:
         Lista de registros de documento registrados na base de dados
@@ -418,17 +430,23 @@ class DatabaseService:
         Erro:
         DocumentNotFound: documento não encontrado na base de dados.
         """
-        read_record = self.db_manager.read(document_id)
         self.db_manager.put_attachment(document_id,
                                        file_id,
                                        content,
                                        file_properties)
+        document = self.db_manager.read(document_id)
         document_record = {
-            'document_id': read_record['document_id'],
-            'document_type': read_record['document_type'],
-            'created_date': read_record['created_date'],
+            'document_id': document['document_id'],
+            'document_type': document['document_type'],
+            'content': document['content'],
+            'created_date': document['created_date']
         }
-        self._register_change(document_record, ChangeType.UPDATE, file_id)
+        document_record = self.db_manager._add_attachment_properties(
+                document_record,
+                file_id,
+                file_properties
+            )
+        self.update(document_id, document_record)
 
     def get_attachment(self, document_id, file_id):
         """
