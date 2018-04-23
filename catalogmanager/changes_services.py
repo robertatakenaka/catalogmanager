@@ -18,34 +18,3 @@ class ChangesServices:
         ]
         sort = [{'document_change_date': 'asc'}]
         return self.changes_db_manager.find(selector, fields, sort)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-""""
-        change_record = {
-            'change_id': uuid4().hex,
-            'document_id': document_record['document_id'],
-            'document_type': document_record['document_type'],
-            'type': change_type.value,
-            'created_date': str(datetime.utcnow().timestamp()),
-        }
-        if attachment_id:
-            change_record.update({'attachment_id': attachment_id})
-        self.changes_db_manager.create(
-            change_record['change_id'],
-            change_record
-        )
-        return change_record['change_id']
-
-"""
