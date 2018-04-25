@@ -4,27 +4,15 @@ from catalog_persistence.models import (
         get_record,
         RecordType,
     )
-from catalog_persistence.databases import (
-        DatabaseService,
-        DocumentNotFound
-    )
+from catalog_persistence.databases import DocumentNotFound
+from catalog_persistence.services import DatabaseService
 from .models.article_model import (
-    Article,
+    ArticleDocument,
 )
 from .models.file import File
 
 
 Record = get_record
-
-
-def FileProperties(file):
-    return {
-        'content_size': file.size,
-        'content_type': file.content_type,
-        'file_fullpath': file.file_fullpath,
-        'file_name': file.name,
-        'file_path': file.path,
-    }
 
 
 class ArticleServicesException(Exception):
@@ -43,17 +31,13 @@ class ArticleServices:
         self.article_db_service = DatabaseService(
             articles_db_manager, changes_db_manager)
 
-    def receive_package(self, id, files=None, **xml_properties):
-        article = self.receive_xml_file(id, **xml_properties)
+    def receive_package(self, id, xml_file, files=None):
+        article = self.receive_xml_file(id, xml_file)
         self.receive_asset_files(article, files)
         return article.unexpected_files_list, article.missing_files_list
 
-    def receive_xml_file(self, id, **xml_properties):
-        article = Article(id)
-
-        xml_file = File(xml_properties['filename'])
-        xml_file.content = xml_properties['content']
-        xml_file.size = xml_properties['content_size']
+    def receive_xml_file(self, id, xml_file):
+        article = ArticleDocument(id)
         article.xml_file = xml_file
 
         article_record = Record(
@@ -68,24 +52,24 @@ class ArticleServices:
             document_id=article.id,
             file_id=article.xml_file.name,
             content=article.xml_tree.content,
-            file_properties=FileProperties(article.xml_file)
+            file_properties=article.xml_file.properties()
         )
         return article
 
     def receive_asset_files(self, article, files):
         if files is not None:
-            for file_properties in files:
-                self.receive_asset_file(article, file_properties)
+            for file in files:
+                self.receive_asset_file(article, file)
 
-    def receive_asset_file(self, article, file_properties):
-        if file_properties is not None:
-            asset = article.update_asset_file(file_properties)
+    def receive_asset_file(self, article, file):
+        if file is not None:
+            asset = article.update_asset_file(file)
             if asset is not None:
                 self.article_db_service.put_attachment(
                     document_id=article.id,
                     file_id=asset.file.name,
                     content=asset.file.content,
-                    file_properties=FileProperties(asset.file)
+                    file_properties=asset.file.properties()
                 )
 
     def get_article_data(self, article_id):
@@ -94,22 +78,19 @@ class ArticleServices:
             return article_record
         except DocumentNotFound:
             raise ArticleServicesException(
-                'Article {} not found'.format(article_id)
+                'ArticleDocument {} not found'.format(article_id)
             )
 
     def get_article_file(self, article_id):
         article_record = self.get_article_data(article_id)
-        article = Article(article_id)
+        article = ArticleDocument(article_id)
         try:
             attachment = self.article_db_service.get_attachment(
                 document_id=article_id,
                 file_id=article_record['content']['xml']
             )
-
-            xml_file = File(article_record['content']['xml'])
-            xml_file.content = attachment
-            xml_file.size = len(attachment)
-            article.xml_file = xml_file
+            article.xml_file = File(file_name=article_record['content']['xml'],
+                                    content=attachment)
             return article.xml_file.content
         except DocumentNotFound:
             raise ArticleServicesException(
@@ -145,6 +126,6 @@ class ArticleServices:
             return content_type, content
         except DocumentNotFound:
             raise ArticleServicesException(
-                'Asset file {} (Article {}) not found. '.format(
+                'AssetDocument file {} (ArticleDocument {}) not found.'.format(
                     asset_id, article_id)
             )

@@ -6,9 +6,9 @@ from catalogmanager.article_services import ArticleServices
 from catalogmanager.models.file import File
 from catalog_persistence.databases import (
     InMemoryDBManager,
-    CouchDBManager,
-    DatabaseService
+    CouchDBManager
 )
+from catalog_persistence.services import DatabaseService
 
 
 @pytest.fixture(scope="module")
@@ -44,18 +44,6 @@ def test_package_A(test_fixture_dir, test_packA_filenames):
         read_file(test_fixture_dir, '741a', filename)
         for filename in test_packA_filenames
     )
-
-
-@pytest.fixture(scope="module")
-def test_packA_assets_files(test_package_A):
-    return [
-        {
-            'filename': asset_file.name,
-            'content': asset_file.content,
-            'content_size': asset_file.size
-        }
-        for asset_file in test_package_A[1:]
-    ]
 
 
 @pytest.fixture(scope="module")
@@ -137,15 +125,11 @@ def setup(request, functional_config, change_service):
 
 
 @pytest.fixture
-def inmemory_receive_package(change_service, test_package_A,
-                             test_packA_assets_files):
+def inmemory_receive_package(change_service, test_package_A):
     article_services = ArticleServices(change_service[0], change_service[1])
-    xml_file = test_package_A[0]
     return article_services.receive_package(id='ID',
-                                            files=test_packA_assets_files,
-                                            filename=xml_file.name,
-                                            content=xml_file.content,
-                                            content_size=xml_file.size)
+                                            xml_file=test_package_A[0],
+                                            files=test_package_A[1:])
 
 
 @pytest.fixture
@@ -180,15 +164,11 @@ def dbserver_service(functional_config, database_config):
 
 
 @pytest.fixture
-def couchdb_receive_package(dbserver_service, test_package_A,
-                            test_packA_assets_files):
+def couchdb_receive_package(dbserver_service, test_package_A):
     article_services = ArticleServices(
         dbserver_service[0],
         dbserver_service[1]
     )
-    xml_file = test_package_A[0]
     return article_services.receive_package(id='ID',
-                                            files=test_packA_assets_files,
-                                            filename=xml_file.name,
-                                            content=xml_file.content,
-                                            content_size=xml_file.size)
+                                            xml_file=test_package_A[0],
+                                            files=test_package_A[1:])
