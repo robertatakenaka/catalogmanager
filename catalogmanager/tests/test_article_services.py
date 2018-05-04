@@ -37,13 +37,18 @@ def test_receive_xml_file(change_service, test_package_A,
 
 def test_receive_package(change_service, test_package_A):
     article_services = ArticleServices(change_service[0], change_service[1])
-    unexpected, missing = article_services.receive_package(
+    registered, unexpected, missing = article_services.receive_package(
         id='ID',
         xml_file=test_package_A[0],
         files=test_package_A[1:]
     )
+    expected = [
+        (file.name, file.size)
+        for file in test_package_A
+    ]
     assert unexpected == []
     assert missing == []
+    assert registered == expected
 
 
 @patch.object(DatabaseService, 'read')

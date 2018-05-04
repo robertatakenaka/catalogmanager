@@ -1,11 +1,16 @@
 import io
 import abc
-
 import couchdb
 
 
 class DocumentNotFound(Exception):
     pass
+
+
+class RegistrationFailed(Exception):
+
+    def __init__(self, message):
+        self.message = message
 
 
 class BaseDBManager(metaclass=abc.ABCMeta):
